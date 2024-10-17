@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Analyzer</title>
+  <style>
+    body {
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      background: linear-gradient(135deg, #00f260, #0575E6);
+      color: #333;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .container {
+      background-color: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+      border-radius: 15px;
+      padding: 40px;
+      width: 400px;
+      text-align: center;
+      color: #fff;
+      transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+    }
+
+    .container:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+    }
+
+    h2 {
+      font-size: 28px;
+      font-weight: bold;
+      margin-bottom: 20px;
+      color: #fff;
+    }
+
+    input[type="file"] {
+      width: 100%;
+      padding: 12px;
+      border-radius: 25px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      background-color: rgba(255, 255, 255, 0.2);
+      color: #fff;
+      outline: none;
+      margin-bottom: 20px;
+      font-size: 16px;
+      transition: all 0.3s ease-in-out;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: #00f260;
+      border: none;
+      border-radius: 25px;
+      font-size: 16px;
+      color: #fff;
+      cursor: pointer;
+      transition: background-color 0.3s ease-in-out;
+    }
+
+    button:hover {
+      background-color: #0575E6;
+    }
+
+    .progress-container {
+      width: 100%;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .progress-container.active {
+      display: block;
+    }
+
+    .progress-bar {
+      width: 100%;
+      background-color: rgba(255, 255, 255, 0.2);
+      border-radius: 25px;
+      overflow: hidden;
+      height: 20px;
+      margin-bottom: 10px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0;
+      background: linear-gradient(135deg, #00f260, #0575E6);
+      transition: width 0.3s ease-in-out;
+    }
+
+    #response {
+      height: 150px;
+      overflow-y: auto;
+      margin-top: 20px;
+      padding: 10px;
+      background-color: rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+    }
+
+    #response p {
+      font-size: 18px;
+      margin: 10px 0;
+      color: #fff;
+    }
+
+    @media (max-width: 480px) {
+      .container {
+        width: 90%;
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h2>文本识别</h2>
+  
+    <input type="file" id="imageInput" accept="image/*" multiple><br><br>
+    <button id="sendButton">开始</button>
+    
+    <div id="progressBarsContainer"></div>
+  
+    <div id="response"></div>
+  </div>
+
+  <script>
+    document.getElementById('sendButton').addEventListener('click', () => {
+      const apiKey = "YOUR_API_KEY"; // Don't expose API keys publicly!
+      const fileInput = document.getElementById('imageInput');
+      const progressBarsContainer = document.getElementById('progressBarsContainer');
+      const responseContainer = document.getElementById('response');
+
+      if (fileInput.files.length === 0) {
+        alert('Please select at least one image.');
+        return;
+      }
+
+      progressBarsContainer.innerHTML = ''; // Clear any previous progress bars
+      responseContainer.innerHTML = ''; // Clear any previous responses
+
+      Array.from(fileInput.files).forEach((file, index) => {
+        const reader = new FileReader();
+        const progressBar = createProgressBar(index);
+        progressBarsContainer.appendChild(progressBar.container);
+
+        reader.onloadend = function () {
+          const base64Image = reader.result.split(',')[1];
+          sendImage(base64Image, index, progressBar.fill);
+        };
+
+        reader.readAsDataURL(file);
+      });
+    });
+
+    function createProgressBar(index) {
+      const progressContainer = document.createElement('div');
+      progressContainer.classList.add('progress-container', 'active');
+
+      const progressBar = document.createElement('div');
+      progressBar.classList.add('progress-bar');
+
+      const progressFill = document.createElement('div');
+      progressFill.classList.add('progress-fill');
+
+      progressBar.appendChild(progressFill);
+      progressContainer.appendChild(progressBar);
+
+      return { container: progressContainer, fill: progressFill };
+    }
+
+    function sendImage(base64Image, index, progressFill) {
+      const apiKey = "sk-wkJ8C4yXkzkXiwUm2e0322A6Bf254239824bC7D6F91a3468"; // Don't expose API keys publicly!
+      const payload = {
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "请输出图片中的文字"
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:image/jpeg;base64,${base64Image}`
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 300
+      };
+
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "https://xiaoai.plus/v1/chat/completions", true);
+      xhr.setRequestHeader("Content-Type", "application/json");
+      xhr.setRequestHeader("Authorization", `Bearer ${apiKey}`);
+
+      xhr.upload.onprogress = function (event) {
+        if (event.lengthComputable) {
+          const percentComplete = (event.loaded / event.total) * 100;
+          progressFill.style.width = percentComplete + '%';
+        }
+      };
+
+      xhr.onload = function () {
+        const data = JSON.parse(xhr.responseText);
+        const gptResponse = data.choices[0].message.content;
+        const responseParagraph = document.createElement('p');
+        responseParagraph.textContent = `Image ${index + 1}: ${gptResponse}`;
+        document.getElementById('response').appendChild(responseParagraph);
+      };
+
+      xhr.onerror = function () {
+        const responseParagraph = document.createElement('p');
+        responseParagraph.textContent = `Error analyzing image ${index + 1}`;
+        document.getElementById('response').appendChild(responseParagraph);
+      };
+
+      xhr.send(JSON.stringify(payload));
+    }
+  </script>
+
+</body>
+</html>
